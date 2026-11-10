@@ -1,0 +1,10 @@
+[
+  {
+    "olt": "OLT-01",
+    "cluster": "Cluster-A",
+    "puerto": "PON-1/1",
+    "fat": "FAT-101",
+    "estado": "Correctivo",
+    "kpi": "RX Level Crítico"
+  }
+]
