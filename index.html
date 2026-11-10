@@ -3,118 +3,904 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard TRX - Claro VTR</title>
-    <!-- Tailwind CSS para diseño moderno -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Chart.js para gráficos -->
+    <title>Matriz Espacial Unificada - Claro & VTR</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --text-light: #f8fafc;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+            --accent-purple: #a855f7;
+            --accent-cyan: #06b6d4;
+            --accent-pink: #ec4899;
+            --border-color: #334155;
+        }
+        body { margin: 0; padding: 20px; background-color: var(--bg-dark); color: var(--text-light); font-family: 'Segoe UI', system-ui, sans-serif; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .header-title h1 { margin: 0; font-size: 22px; color: #38bdf8; }
+        .timestamp-badge { background: #090d16; border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 6px; font-size: 12px; color: #38bdf8; }
+        .filter-bar { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+        .filter-group label { font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase; }
+        .filter-group select { background: #0f172a; color: #f8fafc; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+        .btn-reset { background: #0284c7; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; align-self: flex-end; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .kpi-card { background: var(--panel-bg); border-radius: 8px; padding: 12px 15px; border: 1px solid var(--border-color); border-left: 5px solid var(--border-color); cursor: pointer; transition: transform 0.2s; position: relative; }
+        .kpi-card:hover { transform: translateY(-2px); background: #263548; }
+        .active-filter { background: #334155 !important; border: 1px solid #38bdf8 !important; }
+        .kpi-header-row { display: flex; justify-content: space-between; align-items: center; gap: 5px; }
+        .kpi-title { font-size: 10.5px; text-transform: uppercase; color: #94a3b8; font-weight: 600; }
+        .kpi-value { font-size: 18px; font-weight: 700; margin-top: 4px; white-space: nowrap; }
+        
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            background: #334155;
+            color: #38bdf8;
+            border-radius: 50%;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            position: relative;
+        }
+        .tooltip-box {
+            visibility: hidden;
+            width: 280px;
+            background: #0f172a;
+            color: #f8fafc;
+            text-align: left;
+            border-radius: 6px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: 1px solid #38bdf8;
+            font-size: 11px;
+            font-weight: normal;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+            line-height: 1.4;
+        }
+        .kpi-card:nth-last-child(-n+2) .tooltip-box,
+        .kpi-card.right-align-tooltip .tooltip-box {
+            left: auto;
+            right: 0;
+            transform: none;
+        }
+        .tooltip-icon:hover .tooltip-box {
+            visibility: visible;
+            opacity: 1;
+        }
+        .tooltip-box .tt-title { font-weight: bold; color: #38bdf8; margin-bottom: 4px; font-size: 12px; border-bottom: 1px solid #334155; padding-bottom: 3px; }
+        .table-panel { background: var(--panel-bg); border-radius: 8px; padding: 20px; border: 1px solid var(--border-color); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .pagination-bar { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #94a3b8; }
+        .pagination-bar button { background: #0f172a; color: #38bdf8; border: 1px solid var(--border-color); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .table-container { max-height: 550px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        th { background: #0f172a; color: #38bdf8; position: sticky; top: 0; z-index: 10; }
+        tr:hover { background: rgba(56, 189, 248, 0.05); }
+        .clickable-row { cursor: pointer; }
+        .clickable-row:hover { background: rgba(56, 189, 248, 0.15) !important; }
+        .btn-excel { background: #10b981; color: white; border: none; padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; }
+        
+        .summary-wrapper { 
+            display: flex !important; 
+            flex-direction: row !important; 
+            gap: 15px; 
+            margin-top: 15px; 
+            margin-bottom: 20px; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .summary-panel { 
+            background: #090d16; 
+            border-radius: 8px; 
+            padding: 15px; 
+            border: 1px solid #38bdf8; 
+            flex: 1 !important; 
+            width: 48% !important;
+            display: none; 
+            box-sizing: border-box;
+        }
+        .summary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .summary-title { font-size: 12px; font-weight: bold; color: #38bdf8; text-transform: uppercase; }
+        .summary-close { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 10px; font-weight: bold; }
+        .summary-table-total-row { background: #0f172a; font-weight: bold; color: #38bdf8; border-top: 2px solid #38bdf8; }
+    </style>
 </head>
-<body class="bg-slate-100 font-sans antialiased">
-    <div class="min-h-screen flex flex-col">
-        <!-- Header -->
-        <header class="bg-slate-900 text-white shadow-md py-4 px-6 flex justify-between items-center">
-            <h1 class="text-xl font-bold tracking-wide">Dashboard Operativo FTTH - Claro VTR</h1>
-            <span id="status-badge" class="text-xs bg-amber-500 text-slate-950 px-3 py-1 rounded-full font-semibold">Cargando datos...</span>
-        </header>
+<body>
 
-        <!-- Main Container -->
-        <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
-            <!-- Loading State -->
-            <div id="loading-container" class="flex flex-col items-center justify-center py-20">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                <p class="text-slate-600 font-medium">Sincronizando telemetría de red y tablas de resumen...</p>
-            </div>
-
-            <!-- Dashboard Content (Oculto hasta que carguen los datos) -->
-            <div id="dashboard-content" class="hidden space-y-6">
-                <!-- Tarjetas de Resumen / KPIs -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase">Total Registros</h3>
-                        <p id="metric-total" class="text-2xl font-black text-slate-800 mt-1">0</p>
-                    </div>
-                </div>
-
-                <!-- Tabla de Datos Dinámica -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-100 font-bold text-slate-700">Detalle de Telemetría OLT / FAT</div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-                                <tr>
-                                    <th class="p-3">OLT</th>
-                                    <th class="p-3">Cluster</th>
-                                    <th class="p-3">Puerto PON</th>
-                                    <th class="p-3">FAT</th>
-                                    <th class="p-3">Estado</th>
-                                    <th class="p-3">KPI / Alarma</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-datos" class="divide-y divide-slate-100 text-sm text-slate-700">
-                                <!-- Se llena por JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
+    <div class="header-container">
+        <div class="header-title">
+            <h1>MATRIZ ESPACIAL UNIFICADA DE TELEMETRÍA ÓPTICA <span style="background: #0284c7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">Claro & VTR</span></h1>
+        </div>
+        <div class="timestamp-badge"><b>Actualización:</b> 2026-11-10 14:32:40</div>
     </div>
 
-    <!-- Script de carga asíncrona y renderizado -->
-    <script>
-        let globalDataset = [];
+    <!-- PANTALLA DE CARGA ASÍNCRONA -->
+    <div id="loading-screen" style="text-align: center; padding: 50px;">
+        <h2 style="color: #38bdf8;">Cargando datos de telemetría desde data.json...</h2>
+        <p style="color: #94a3b8;">Espere un momento mientras se procesan los registros de red.</p>
+    </div>
 
-        async function cargarDatos() {
+    <div id="main-dashboard" style="display: none;">
+        <!-- FILTROS CRUZADOS INDEPENDIENTES -->
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>Red / Operación</label>
+                <select id="filtroRed" onchange="onFilterChanged()">
+                    <option value="TODAS">-- Todas las Redes --</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Localidad</label>
+                <select id="filtroLocalidad" onchange="onFilterChanged()">
+                    <option value="TODAS">-- Todas las Localidades --</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>OLT</label>
+                <select id="filtroOlt" onchange="onFilterChanged()">
+                    <option value="TODAS">-- Todas las OLTs --</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Cluster</label>
+                <select id="filtroCluster" onchange="onFilterChanged()">
+                    <option value="TODOS">-- Todos los Clusters --</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Puerto PON</label>
+                <select id="filtroPuerto" onchange="onFilterChanged()">
+                    <option value="TODOS">-- Todos los Puertos --</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Condición</label>
+                <select id="filtroCondicion" onchange="onFilterChanged()">
+                    <option value="TODAS">-- Todas las Condiciones --</option>
+                    <option value="Afectadas">Afectadas</option>
+                    <option value="Condición Normal">Condición Normal</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Nivel de Impacto</label>
+                <select id="filtroImpacto" onchange="onFilterChanged()">
+                    <option value="TODOS">-- Todos los Impactos --</option>
+                    <option value="Impactadas">Impactadas</option>
+                    <option value="Estresadas">Estresadas</option>
+                    <option value="Offline">Offline</option>
+                </select>
+            </div>
+            <button class="btn-reset" onclick="resetFilters()">Reset Filtros</button>
+        </div>
+
+        <!-- KPIS: FILA 1 -->
+        <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="kpi-card" id="card-TODOS" onclick="filterBySymptom('TODOS')" style="border-left-color: #38bdf8;">
+                <div class="kpi-header-row"><span class="kpi-title">Total ONTs Evaluadas</span></div>
+                <div class="kpi-value" id="kpiTotal" style="color: #38bdf8;">0</div>
+            </div>
+            <div class="kpi-card" id="card-FAVOR" onclick="filterByFallas()" style="border-left-color: #ef4444;">
+                <div class="kpi-header-row"><span class="kpi-title">ONTs con Fallas</span></div>
+                <div class="kpi-value" id="kpiFallas" style="color: #ef4444;">0</div>
+            </div>
+            <div class="kpi-card" id="card-1. Rango Nominal" onclick="filterBySymptom('1. Rango Nominal')" style="border-left-color: var(--accent-green);">
+                <div class="kpi-header-row"><span class="kpi-title">1. Rango Nominal</span></div>
+                <div class="kpi-value" id="kpiOptimo" style="color: var(--accent-green);">0</div>
+            </div>
+            <div class="kpi-card" id="card-Correctiva" onclick="filterByAttentionType('Correctiva (Inmediata)')" style="border-left-color: #ef4444;">
+                <div class="kpi-header-row"><span class="kpi-title">Correctiva (Inmediata)</span></div>
+                <div class="kpi-value" id="kpiCorrectiva" style="color: #ef4444;">0</div>
+            </div>
+            <div class="kpi-card" id="card-Preventiva" onclick="filterByAttentionType('Preventiva (Proactiva de Red)')" style="border-left-color: #f59e0b;">
+                <div class="kpi-header-row"><span class="kpi-title">Preventiva (Proactiva)</span></div>
+                <div class="kpi-value" id="kpiPreventiva" style="color: #f59e0b;">0</div>
+            </div>
+            <div class="kpi-card right-align-tooltip" id="card-4. Vector Bias (> 35mA)" onclick="filterBySymptom('4. Vector Bias (> 35mA)')" style="border-left-color: var(--accent-purple);">
+                <div class="kpi-header-row"><span class="kpi-title">4. Vector Bias (> 35mA)</span></div>
+                <div class="kpi-value" id="kpiLaser" style="color: var(--accent-purple);">0</div>
+            </div>
+        </div>
+
+        <!-- KPIS: FILA 2 -->
+        <div class="kpi-grid" style="margin-bottom: 12px;">
+            <div class="kpi-card" id="macro-card-Falla OLT" onclick="filterByMacroCard('Falla OLT')" style="border-left-color: #dc2626;">
+                <div class="kpi-header-row"><span class="kpi-title">Falla OLT</span></div>
+                <div class="kpi-value" id="kpiOlt" style="color: #dc2626; font-size: 15px;">0</div>
+            </div>
+            <div class="kpi-card" id="macro-card-Falla Clúster" onclick="filterByMacroCard('Falla Clúster')" style="border-left-color: #ea580c;">
+                <div class="kpi-header-row"><span class="kpi-title">Falla Clúster</span></div>
+                <div class="kpi-value" id="kpiCluster" style="color: #ea580c; font-size: 15px;">0</div>
+            </div>
+            <div class="kpi-card" id="macro-card-Puerto (OTDR)" onclick="filterByMacroCard('Puerto (OTDR)')" style="border-left-color: #ef4444;">
+                <div class="kpi-header-row"><span class="kpi-title">Puerto (OTDR)</span></div>
+                <div class="kpi-value" id="kpiPuerto" style="color: #ef4444; font-size: 15px;">0</div>
+            </div>
+            <div class="kpi-card" id="macro-card-FAT Afectada" onclick="filterByMacroCard('FAT Afectada')" style="border-left-color: #f59e0b;">
+                <div class="kpi-header-row"><span class="kpi-title">FAT Afectada</span></div>
+                <div class="kpi-value" id="kpiFat" style="color: #f59e0b; font-size: 15px;">0</div>
+            </div>
+            <div class="kpi-card right-align-tooltip" id="macro-card-Falla Cliente" onclick="filterByMacroCard('Falla Cliente')" style="border-left-color: #38bdf8;">
+                <div class="kpi-header-row"><span class="kpi-title">Falla Cliente</span></div>
+                <div class="kpi-value" id="kpiCliente" style="color: #38bdf8; font-size: 15px;">0</div>
+            </div>
+        </div>
+
+        <!-- KPIS: FILA 3 -->
+        <div class="kpi-grid" id="fila3-cablelabs" style="margin-bottom: 12px; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));">
+            <div class="kpi-card" id="adv-card-fec" onclick="filterByAdvancedParam('fec')" style="border-left-color: #38bdf8;">
+                <div class="kpi-header-row"><span class="kpi-title">1. FEC Crítico</span></div>
+                <div class="kpi-value" style="color: #38bdf8;" id="valFec">0</div>
+            </div>
+            <div class="kpi-card" id="adv-card-osp" onclick="filterByAdvancedParam('osp')" style="border-left-color: #10b981;">
+                <div class="kpi-header-row"><span class="kpi-title">2. Desviación OSP (>3dB)</span></div>
+                <div class="kpi-value" style="color: #10b981;" id="valOsp">0</div>
+            </div>
+            <div class="kpi-card" id="adv-card-drop" onclick="filterByAdvancedParam('drop')" style="border-left-color: #f59e0b;">
+                <div class="kpi-header-row"><span class="kpi-title">3. Drop Events / Capa 2</span></div>
+                <div class="kpi-value" style="color: #f59e0b;" id="valDrop">0</div>
+            </div>
+            <div class="kpi-card" id="adv-card-temp" onclick="filterByAdvancedParam('temp')" style="border-left-color: #a855f7;">
+                <div class="kpi-header-row"><span class="kpi-title">4. Estrés Térmico (ΔT≥10°C)</span></div>
+                <div class="kpi-value" style="color: #a855f7;" id="valTemp">0</div>
+            </div>
+            <div class="kpi-card" id="adv-card-orl" onclick="filterByAdvancedParam('orl')" style="border-left-color: var(--accent-cyan);">
+                <div class="kpi-header-row"><span class="kpi-title">5. ORL / Reflectancia (<32dB)</span></div>
+                <div class="kpi-value" style="color: var(--accent-cyan);" id="valOrl">0</div>
+            </div>
+            <div class="kpi-card" id="adv-card-clima" onclick="filterByAdvancedParam('clima')" style="border-left-color: var(--accent-pink);">
+                <div class="kpi-header-row"><span class="kpi-title">6. Estrés Clima (ΔT≥15°C)</span></div>
+                <div class="kpi-value" style="color: var(--accent-pink);" id="valClima">0</div>
+            </div>
+            <div class="kpi-card right-align-tooltip" id="adv-card-sla" onclick="filterByAdvancedParam('sla')" style="border-left-color: #ef4444;">
+                <div class="kpi-header-row"><span class="kpi-title">7. Riesgo SLA / Prioridad OT</span></div>
+                <div class="kpi-value" style="color: #ef4444;" id="valSla">0</div>
+            </div>
+        </div>
+
+        <!-- KPIS: FILA 4 -->
+        <div id="fila4-marcas" class="kpi-grid" style="margin-bottom: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));"></div>
+
+        <!-- DOBLE TABLA RESUMEN -->
+        <div id="summaryWrapper" class="summary-wrapper" style="display: none;">
+            <div id="summaryPanel" class="summary-panel">
+                <div class="summary-header">
+                    <span id="summaryTitle" class="summary-title">RESUMEN JERÁRQUICO</span>
+                    <button class="summary-close" onclick="closeSummaryPanel()">Cerrar</button>
+                </div>
+                <div class="table-container" style="max-height: 280px;">
+                    <table id="summaryTable">
+                        <thead id="summaryThead"></thead>
+                        <tbody id="summaryTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="summaryPanelSecundario" class="summary-panel">
+                <div class="summary-header">
+                    <span id="summaryTitleSec" class="summary-title">RESUMEN AGREGADO</span>
+                </div>
+                <div class="table-container" style="max-height: 280px;">
+                    <table id="summaryTableSec">
+                        <thead id="summaryTheadSec"></thead>
+                        <tbody id="summaryTbodySec"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLA DE ANÁLISIS COMPLETA -->
+        <div class="table-panel" style="border-top: 3px solid #38bdf8; margin-top: 20px;">
+            <div class="table-header">
+                <div>
+                    <h3 style="color: #38bdf8;">TABLA DE ANÁLISIS</h3>
+                </div>
+                <div class="pagination-bar">
+                    <button class="btn-excel" onclick="exportToExcel('cablelabs')">Exportar CableLabs v2 (.xlsx)</button>
+                    <span id="tableCountInfoV2">Mostrando 0-0 de 0</span>
+                    <button id="btnPrevV2" onclick="changePageV2(-1)" disabled>&laquo; Anterior</button>
+                    <span id="pageIndicatorV2">Página 1 de 1</span>
+                    <button id="btnNextV2" onclick="changePageV2(1)" disabled>Siguiente &raquo;</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Red</th><th>Serie ONT</th><th>Localidad</th><th>OLT</th><th>Cluster</th><th>Puerto PON</th><th>Caja FAT</th><th>Dirección Cliente</th>
+                            <th>Hallazgo Red (Macro)</th><th>Tipo de Atención</th><th>Causa Raíz NOC</th><th>Acción Recomendada</th><th>Acción Detallada (CableLabs)</th>
+                            <th>Prioridad SLA / OT</th><th>Reflectancia (ORL)</th><th>Marca ONT</th><th>Condición</th><th>Impacto</th>
+                            <th>Distancia</th><th>Desfase ΔL</th><th>Atenuación OSP</th><th>Desviación ΔOSP</th><th>FEC / CodeWords</th>
+                            <th>Estrés Térmico ΔT</th><th>Rx ONT</th><th>Rx OLT</th><th>Tx ONT</th><th>Láser Bias</th><th>Temp (°C)</th>
+                            <th>Voltaje</th><th>QoE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBodyV2"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawPoints = [];
+        let currentSymptomFilter = 'TODOS';
+        let currentMacroFilter = 'TODOS';
+        let currentBrandFilter = 'TODOS';
+        let currentAdvancedFilter = 'TODOS';
+        let currentAttentionFilter = 'TODOS';
+        let filterOnlyFailures = false;
+        let currentPageV2 = 1;
+        const rowsPerPage = 200;
+        let activeFilteredPoints = [];
+
+        async function initDashboardData() {
             try {
                 const response = await fetch('data.json');
-                if (!response.ok) throw new Error('No se pudo cargar el archivo data.json');
+                if (!response.ok) throw new Error('No se pudo cargar data.json');
+                const pData = await response.json();
                 
-                globalDataset = await response.json();
-                
-                // Ocultar loader y mostrar dashboard
-                document.getElementById('loading-container').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                document.getElementById('status-badge').className = 'text-xs bg-emerald-500 text-white px-3 py-1 rounded-full font-semibold';
-                document.getElementById('status-badge').innerText = 'En Línea (' + globalDataset.length + ' registros)';
+                rawPoints = pData.map(p => ({
+                    red: p.r, x: p.x, y: p.y, tx: p.t, bias: p.b, temp: p.tp, voltage: p.v, qoe: p.q,
+                    delta_loss: p.dl, fec_status: p.fs, delta_temp: p.dt, orl_val: p.or, sla_priority: p.sp,
+                    marca_ont: p.mo, causa_raiz_noc: p.cr, macro_accion_corta: p.ac, macro_accion_detallada: p.ad,
+                    condicion: p.co, impacto: p.im, macro_hallazgo: p.mh, tipo_atencion: p.ta,
+                    serial: p.sr, zona: p.zo, olt: p.ol, cluster: p.cl, puerto: p.pu, fat: p.fa,
+                    direccion: p.di, distancia: p.ds, categoria: p.cat, tiene_falla: p.tf,
+                    is_fec: p.ifec, is_osp: p.iosp, is_drop: p.idrop, is_temp: p.itemp, is_orl: p.iorl, is_clima: p.icli
+                }));
 
-                // Inicializar visualizaciones y tablas
-                renderizarDashboard(globalDataset);
+                activeFilteredPoints = rawPoints;
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('main-dashboard').style.display = 'block';
 
-            } catch (error) {
-                document.getElementById('loading-container').innerHTML = `
-                    <div class="text-red-600 font-bold bg-red-50 p-4 rounded-lg border border-red-200">
-                        Error al cargar los datos del dashboard: ${error.message}
-                    </div>
-                `;
-                console.error(error);
+                initDropdowns();
+                applyFilters();
+            } catch (err) {
+                document.getElementById('loading-screen').innerHTML = `<h3 style="color: #ef4444;">Error al cargar data.json: ${err.message}</h3>`;
             }
         }
 
-        function renderizarDashboard(data) {
-            // Actualizar métricas
-            document.getElementById('metric-total').innerText = data.length.toLocaleString();
+        function initDropdowns() {
+            populateDropdown('filtroRed', 'red', '-- Todas las Redes --', 'TODAS');
+            populateDropdown('filtroLocalidad', 'zona', '-- Todas las Localidades --', 'TODAS');
+            populateDropdown('filtroOlt', 'olt', '-- Todas las OLTs --', 'TODAS');
+            populateDropdown('filtroCluster', 'cluster', '-- Todos los Clusters --', 'TODOS');
+            populateDropdown('filtroPuerto', 'puerto', '-- Todos los Puertos --', 'TODOS');
+        }
 
-            // Poblar tabla
-            const tbody = document.getElementById('tabla-datos');
-            tbody.innerHTML = '';
+        function populateDropdown(elementId, fieldName, defaultText, defaultValue) {
+            const select = document.getElementById(elementId);
+            const currentVal = select.value;
+            
+            const partialFiltered = rawPoints.filter(p => {
+                if (elementId !== 'filtroRed') {
+                    const val = document.getElementById('filtroRed').value;
+                    if (val !== 'TODAS' && p.red !== val) return false;
+                }
+                if (elementId !== 'filtroLocalidad') {
+                    const val = document.getElementById('filtroLocalidad').value;
+                    if (val !== 'TODAS' && p.zona !== val) return false;
+                }
+                if (elementId !== 'filtroOlt') {
+                    const val = document.getElementById('filtroOlt').value;
+                    if (val !== 'TODAS' && p.olt !== val) return false;
+                }
+                if (elementId !== 'filtroCluster') {
+                    const val = document.getElementById('filtroCluster').value;
+                    if (val !== 'TODOS' && p.cluster !== val) return false;
+                }
+                if (elementId !== 'filtroPuerto') {
+                    const val = document.getElementById('filtroPuerto').value;
+                    if (val !== 'TODOS' && p.puerto !== val) return false;
+                }
+                return true;
+            });
 
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-50 transition-colors';
-                tr.innerHTML = `
-                    <td class="p-3 font-medium">${item.olt || '-'}</td>
-                    <td class="p-3">${item.cluster || '-'}</td>
-                    <td class="p-3">${item.puerto || '-'}</td>
-                    <td class="p-3">${item.fat || '-'}</td>
-                    <td class="p-3"><span class="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold">${item.estado || '-'}</span></td>
-                    <td class="p-3 text-slate-500">${item.kpi || '-'}</td>
+            const uniqueValues = [...new Set(partialFiltered.map(p => p[fieldName]))].sort();
+
+            select.innerHTML = `<option value="${defaultValue}">${defaultText}</option>`;
+            uniqueValues.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                if (val === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+            if (uniqueValues.includes(currentVal)) {
+                select.value = currentVal;
+            } else {
+                select.value = defaultValue;
+            }
+        }
+
+        function renderBrandKpiCards(dataPoints) {
+            const container = document.getElementById('fila4-marcas');
+            container.innerHTML = '';
+            const brandCounts = {};
+            dataPoints.forEach(p => { const b = p.marca_ont || 'Desconocida'; brandCounts[b] = (brandCounts[b] || 0) + 1; });
+            const sortedBrands = Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a]);
+            const colors = ['#ef4444', '#38bdf8', '#10b981', '#f59e0b', '#a855f7', '#ec4899'];
+
+            sortedBrands.forEach((b, idx) => {
+                const safeId = b.replace(/[^a-zA-Z0-9]/g, '');
+                const col = colors[idx % colors.length];
+                const isActive = currentBrandFilter === b ? ' active-filter' : '';
+                const rightClass = (idx >= sortedBrands.length - 2) ? ' right-align-tooltip' : '';
+                container.innerHTML += `
+                    <div class="kpi-card${isActive}${rightClass}" id="brand-card-${safeId}" onclick="filterByBrand('${b}')" style="border-left-color: ${col};">
+                        <div class="kpi-header-row"><span class="kpi-title">${b}</span></div>
+                        <div class="kpi-value" style="color: ${col};">${brandCounts[b].toLocaleString()}</div>
+                    </div>
                 `;
-                tbody.appendChild(tr);
             });
         }
 
-        // Ejecutar carga al iniciar
-        document.addEventListener('DOMContentLoaded', cargarDatos);
+        function updateKpiCards() {
+            const red = document.getElementById('filtroRed').value;
+            const zona = document.getElementById('filtroLocalidad').value;
+            const olt = document.getElementById('filtroOlt').value;
+            const cluster = document.getElementById('filtroCluster').value;
+            const puerto = document.getElementById('filtroPuerto').value;
+            const condicion = document.getElementById('filtroCondicion').value;
+            const impacto = document.getElementById('filtroImpacto').value;
+
+            const baseForCards = rawPoints.filter(p => {
+                if (red !== 'TODAS' && p.red !== red) return false;
+                if (zona !== 'TODAS' && p.zona !== zona) return false;
+                if (olt !== 'TODAS' && p.olt !== olt) return false;
+                if (cluster !== 'TODOS' && p.cluster !== cluster) return false;
+                if (puerto !== 'TODOS' && p.puerto !== puerto) return false;
+                if (condicion !== 'TODAS' && p.condicion !== condicion) return false;
+                if (impacto !== 'TODOS' && p.impacto !== impacto) return false;
+                if (filterOnlyFailures && !p.tiene_falla) return false;
+                if (currentSymptomFilter !== 'TODOS' && p.categoria !== currentSymptomFilter) return false;
+                if (currentAttentionFilter !== 'TODOS' && p.tipo_atencion !== currentAttentionFilter) return false;
+                if (currentMacroFilter !== 'TODOS' && p.macro_hallazgo !== currentMacroFilter) return false;
+                if (currentBrandFilter !== 'TODOS' && p.marca_ont !== currentBrandFilter) return false;
+                if (currentAdvancedFilter === 'fec' && !p.is_fec) return false;
+                if (currentAdvancedFilter === 'osp' && !p.is_osp) return false;
+                if (currentAdvancedFilter === 'drop' && !p.is_drop) return false;
+                if (currentAdvancedFilter === 'temp' && !p.is_temp) return false;
+                if (currentAdvancedFilter === 'orl' && !p.is_orl) return false;
+                if (currentAdvancedFilter === 'clima' && !p.is_clima) return false;
+                if (currentAdvancedFilter === 'sla' && !['Falla OLT', 'Falla Clúster', 'Puerto (OTDR)'].includes(p.macro_hallazgo)) return false;
+                return true;
+            });
+
+            const tot = baseForCards.length;
+            const failCount = baseForCards.filter(p => p.tiene_falla).length;
+            const opt = baseForCards.filter(p => p.categoria === '1. Rango Nominal').length;
+            const correctivaCnt = baseForCards.filter(p => p.tipo_atencion === 'Correctiva (Inmediata)').length;
+            const preventivaCnt = baseForCards.filter(p => p.tipo_atencion === 'Preventiva (Proactiva de Red)').length;
+            const las = baseForCards.filter(p => p.categoria === '4. Vector Bias (> 35mA)').length;
+
+            document.getElementById('kpiTotal').innerText = tot.toLocaleString();
+            document.getElementById('kpiFallas').innerText = failCount.toLocaleString();
+            document.getElementById('kpiOptimo').innerText = opt.toLocaleString();
+            document.getElementById('kpiCorrectiva').innerText = correctivaCnt.toLocaleString();
+            document.getElementById('kpiPreventiva').innerText = preventivaCnt.toLocaleString();
+            document.getElementById('kpiLaser').innerText = las.toLocaleString();
+
+            const oltOnes = baseForCards.filter(p => p.macro_hallazgo === 'Falla OLT');
+            const numOlts = new Set(oltOnes.map(p => p.olt)).size;
+            document.getElementById('kpiOlt').innerText = `ONTs ${oltOnes.length.toLocaleString()} / OLTs ${numOlts.toLocaleString()}`;
+
+            const cluOnes = baseForCards.filter(p => p.macro_hallazgo === 'Falla Clúster');
+            const numClus = new Set(cluOnes.map(p => p.cluster)).size;
+            document.getElementById('kpiCluster').innerText = `ONTs ${cluOnes.length.toLocaleString()} / CLUSTER ${numClus.toLocaleString()}`;
+
+            const pueOnes = baseForCards.filter(p => p.macro_hallazgo === 'Puerto (OTDR)');
+            const numPues = new Set(pueOnes.map(p => p.puerto)).size;
+            document.getElementById('kpiPuerto').innerText = `ONTs ${pueOnes.length.toLocaleString()} / PUERTOS ${numPues.toLocaleString()}`;
+
+            const fatOnes = baseForCards.filter(p => p.macro_hallazgo === 'FAT Afectada');
+            const numFats = new Set(fatOnes.map(p => `${p.olt}_${p.puerto}_${p.fat}`)).size;
+            document.getElementById('kpiFat').innerText = `ONTs ${fatOnes.length.toLocaleString()} / FATs ${numFats.toLocaleString()}`;
+
+            const cliOnes = baseForCards.filter(p => p.macro_hallazgo === 'Falla Cliente');
+            document.getElementById('kpiCliente').innerText = `CLIENTES ${cliOnes.length.toLocaleString()}`;
+
+            document.getElementById('valFec').innerText = baseForCards.filter(p => p.is_fec).length.toLocaleString();
+            document.getElementById('valOsp').innerText = baseForCards.filter(p => p.is_osp).length.toLocaleString();
+            document.getElementById('valDrop').innerText = baseForCards.filter(p => p.is_drop).length.toLocaleString();
+            document.getElementById('valTemp').innerText = baseForCards.filter(p => p.is_temp).length.toLocaleString();
+            document.getElementById('valOrl').innerText = baseForCards.filter(p => p.is_orl).length.toLocaleString();
+            document.getElementById('valClima').innerText = baseForCards.filter(p => p.is_clima).length.toLocaleString();
+            document.getElementById('valSla').innerText = baseForCards.filter(p => ['Falla OLT', 'Falla Clúster', 'Puerto (OTDR)'].includes(p.macro_hallazgo)).length.toLocaleString();
+
+            renderBrandKpiCards(baseForCards);
+        }
+
+        function updateTablePageV2() {
+            const totalRows = activeFilteredPoints.length;
+            const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+            if (currentPageV2 > totalPages) currentPageV2 = totalPages;
+            if (currentPageV2 < 1) currentPageV2 = 1;
+
+            const startIdx = (currentPageV2 - 1) * rowsPerPage;
+            const pageData = activeFilteredPoints.slice(startIdx, startIdx + rowsPerPage);
+            const tbody = document.getElementById('tableBodyV2');
+            tbody.innerHTML = '';
+
+            pageData.forEach(d => {
+                const redBadge = `<span style="background: ${d.red === 'CLARO' ? '#0284c7' : '#f59e0b'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${d.red}</span>`;
+                const tipoAtencionBadge = d.tipo_atencion === 'Correctiva (Inmediata)' 
+                    ? `<span style="color: #ef4444; font-weight: bold;">${d.tipo_atencion}</span>` 
+                    : (d.tipo_atencion === 'Preventiva (Proactiva de Red)' ? `<span style="color: #f59e0b; font-weight: bold;">${d.tipo_atencion}</span>` : `<span style="color: #94a3b8;">${d.tipo_atencion}</span>`);
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${redBadge}</td>
+                        <td><b>${d.serial}</b></td>
+                        <td>${d.zona}</td>
+                        <td>${d.olt}</td>
+                        <td>${d.cluster}</td>
+                        <td>${d.puerto}</td>
+                        <td><b>${d.fat}</b></td>
+                        <td>${d.direccion}</td>
+                        <td><b>${d.macro_hallazgo}</b></td>
+                        <td>${tipoAtencionBadge}</td>
+                        <td>${d.causa_raiz_noc}</td>
+                        <td style="color: #10b981;">${d.macro_accion_corta}</td>
+                        <td style="color: #cbd5e1; font-size: 11px;">${d.macro_accion_detallada}</td>
+                        <td style="color: #ef4444; font-weight: bold;">${d.sla_priority}</td>
+                        <td style="color: #06b6d4;">${d.orl_val} dB</td>
+                        <td><b>${d.marca_ont}</b></td>
+                        <td><b>${d.condicion}</b></td>
+                        <td>${d.impacto}</td>
+                        <td>${d.distancia}</td>
+                        <td style="color:#f59e0b"><b>${d.delta_loss} dB</b></td>
+                        <td>18.5 dB</td>
+                        <td style="color:#ef4444"><b>+${d.delta_loss} dB</b></td>
+                        <td>${d.fec_status}</td>
+                        <td>${d.delta_temp} °C</td>
+                        <td style="color: #38bdf8;">${d.x} dBm</td>
+                        <td style="color: #38bdf8;">${d.y} dBm</td>
+                        <td>${d.tx} dBm</td>
+                        <td style="color: #a855f7;">${d.bias} mA</td>
+                        <td>${d.temp} °C</td>
+                        <td>${d.voltage} mV</td>
+                        <td><b>${d.qoe}</b></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('tableCountInfoV2').innerText = `Mostrando ${totalRows > 0 ? startIdx + 1 : 0}-${Math.min(startIdx + rowsPerPage, totalRows)} de ${totalRows.toLocaleString()}`;
+            document.getElementById('pageIndicatorV2').innerText = `Página ${currentPageV2} de ${totalPages}`;
+            document.getElementById('btnPrevV2').disabled = (currentPageV2 <= 1);
+            document.getElementById('btnNextV2').disabled = (currentPageV2 >= totalPages);
+        }
+
+        function changePageV2(d) { currentPageV2 += d; updateTablePageV2(); }
+
+        function onFilterChanged() {
+            closeSummaryPanel();
+            applyFilters();
+            initDropdowns();
+        }
+
+        function applyFilters() {
+            const red = document.getElementById('filtroRed').value;
+            const zona = document.getElementById('filtroLocalidad').value;
+            const olt = document.getElementById('filtroOlt').value;
+            const cluster = document.getElementById('filtroCluster').value;
+            const puerto = document.getElementById('filtroPuerto').value;
+            const condicion = document.getElementById('filtroCondicion').value;
+            const impacto = document.getElementById('filtroImpacto').value;
+
+            activeFilteredPoints = rawPoints.filter(p => {
+                if (red !== 'TODAS' && p.red !== red) return false;
+                if (zona !== 'TODAS' && p.zona !== zona) return false;
+                if (olt !== 'TODAS' && p.olt !== olt) return false;
+                if (cluster !== 'TODOS' && p.cluster !== cluster) return false;
+                if (puerto !== 'TODOS' && p.puerto !== puerto) return false;
+                if (condicion !== 'TODAS' && p.condicion !== condicion) return false;
+                if (impacto !== 'TODOS' && p.impacto !== impacto) return false;
+                if (filterOnlyFailures && !p.tiene_falla) return false;
+                if (currentSymptomFilter !== 'TODOS' && p.categoria !== currentSymptomFilter) return false;
+                if (currentAttentionFilter !== 'TODOS' && p.tipo_atencion !== currentAttentionFilter) return false;
+                if (currentMacroFilter !== 'TODOS' && p.macro_hallazgo !== currentMacroFilter) return false;
+                if (currentBrandFilter !== 'TODOS' && p.marca_ont !== currentBrandFilter) return false;
+                if (currentAdvancedFilter === 'fec' && !p.is_fec) return false;
+                if (currentAdvancedFilter === 'osp' && !p.is_osp) return false;
+                if (currentAdvancedFilter === 'drop' && !p.is_drop) return false;
+                if (currentAdvancedFilter === 'temp' && !p.is_temp) return false;
+                if (currentAdvancedFilter === 'orl' && !p.is_orl) return false;
+                if (currentAdvancedFilter === 'clima' && !p.is_clima) return false;
+                if (currentAdvancedFilter === 'sla' && !['Falla OLT', 'Falla Clúster', 'Puerto (OTDR)'].includes(p.macro_hallazgo)) return false;
+                return true;
+            });
+
+            currentPageV2 = 1;
+            updateKpiCards();
+            updateTablePageV2();
+        }
+
+        function resetFilters() {
+            document.getElementById('filtroRed').value = 'TODAS';
+            document.getElementById('filtroLocalidad').value = 'TODAS';
+            document.getElementById('filtroOlt').value = 'TODAS';
+            document.getElementById('filtroCluster').value = 'TODOS';
+            document.getElementById('filtroPuerto').value = 'TODOS';
+            document.getElementById('filtroCondicion').value = 'TODAS';
+            document.getElementById('filtroImpacto').value = 'TODOS';
+            
+            currentSymptomFilter = 'TODOS';
+            currentAttentionFilter = 'TODOS';
+            currentMacroFilter = 'TODOS';
+            currentBrandFilter = 'TODOS';
+            currentAdvancedFilter = 'TODOS';
+            filterOnlyFailures = false;
+            
+            activeFilteredPoints = rawPoints;
+            
+            document.querySelectorAll('.kpi-card').forEach(c => c.classList.remove('active-filter'));
+            closeSummaryPanel();
+            initDropdowns();
+            updateKpiCards();
+            updateTablePageV2();
+        }
+
+        function drillDownFilter(tipo, val1, val2) {
+            if (tipo === 'OLT') {
+                document.getElementById('filtroOlt').value = val1;
+            } else if (tipo === 'Puerto PON') {
+                document.getElementById('filtroOlt').value = val1;
+                initDropdowns();
+                document.getElementById('filtroPuerto').value = val2;
+            } else if (tipo === 'Cluster') {
+                document.getElementById('filtroCluster').value = val1;
+            } else if (tipo === 'FAT') {
+                if(val1) document.getElementById('filtroOlt').value = val1;
+                initDropdowns();
+                if(val2) document.getElementById('filtroPuerto').value = val2;
+            }
+            applyFilters();
+            initDropdowns();
+        }
+
+        function renderSummaryTable(macroType) {
+            const wrapper = document.getElementById('summaryWrapper');
+            const panel1 = document.getElementById('summaryPanel');
+            const panel2 = document.getElementById('summaryPanelSecundario');
+            
+            const title1 = document.getElementById('summaryTitle');
+            const thead1 = document.getElementById('summaryThead');
+            const tbody1 = document.getElementById('summaryTbody');
+
+            const title2 = document.getElementById('summaryTitleSec');
+            const thead2 = document.getElementById('summaryTheadSec');
+            const tbody2 = document.getElementById('summaryTbodySec');
+
+            wrapper.style.display = 'flex';
+            panel1.style.display = 'block';
+            panel2.style.display = 'block';
+            
+            tbody1.innerHTML = '';
+            tbody2.innerHTML = '';
+
+            currentMacroFilter = macroType;
+            applyFilters();
+
+            const dataToGroup = activeFilteredPoints;
+
+            if (macroType === 'Falla OLT') {
+                title1.innerText = 'RESUMEN OLTS AFECTADAS (>90% AFECTACIÓN)';
+                thead1.innerHTML = '<tr><th>Red</th><th>OLT</th><th>ONTs Afectadas</th><th>Total OLT</th><th>% Afectación</th></tr>';
+                const grouped1 = {};
+                dataToGroup.forEach(p => {
+                    const key = `${p.red}_${p.olt}`;
+                    if (!grouped1[key]) grouped1[key] = { red: p.red, olt: p.olt, fail: 0 };
+                    grouped1[key].fail++;
+                });
+                let rows1 = Object.values(grouped1).map(g => {
+                    const totalOlt = rawPoints.filter(p => p.red === g.red && p.olt === g.olt).length;
+                    const pct = totalOlt > 0 ? (g.fail / totalOlt) * 100 : 0;
+                    return { ...g, totalOlt, pct };
+                });
+                rows1.sort((a, b) => b.fail - a.fail || b.pct - a.pct);
+                
+                let sumFail1 = 0, sumTotal1 = 0;
+                rows1.forEach(g => {
+                    sumFail1 += g.fail;
+                    sumTotal1 += g.totalOlt;
+                    tbody1.innerHTML += `<tr class="clickable-row" onclick="drillDownFilter('OLT', '${g.olt}')"><td><b>${g.red}</b></td><td><b style="color:#38bdf8">${g.olt}</b></td><td style="color:#ef4444"><b>${g.fail.toLocaleString()}</b></td><td>${g.totalOlt.toLocaleString()}</td><td style="color:#ef4444"><b>${g.pct.toFixed(1)}%</b></td></tr>`;
+                });
+                tbody1.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td style="color:#ef4444">${sumFail1.toLocaleString()}</td><td>${sumTotal1.toLocaleString()}</td><td>${sumTotal1 > 0 ? ((sumFail1/sumTotal1)*100).toFixed(1) : 0}%</td></tr>`;
+
+                title2.innerText = 'CANTIDAD DE OLT POR RED CON FALLA';
+                thead2.innerHTML = '<tr><th>Red</th><th>Cantidad OLT Falla</th></tr>';
+                const grouped2 = {};
+                dataToGroup.forEach(p => {
+                    if (!grouped2[p.red]) grouped2[p.red] = new Set();
+                    grouped2[p.red].add(p.olt);
+                });
+                let rows2 = Object.keys(grouped2).map(red => ({ red: red, cnt: grouped2[red].size }));
+                rows2.sort((a, b) => b.cnt - a.cnt);
+                
+                let sumOltsCnt = 0;
+                rows2.forEach(g => {
+                    sumOltsCnt += g.cnt;
+                    tbody2.innerHTML += `<tr><td><b>${g.red}</b></td><td style="color:#38bdf8"><b>${g.cnt.toLocaleString()}</b></td></tr>`;
+                });
+                tbody2.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td style="color:#38bdf8">${sumOltsCnt.toLocaleString()}</td></tr>`;
+
+            } else if (macroType === 'Falla Clúster') {
+                title1.innerText = 'RESUMEN CLÚSTERES AFECTADOS (>90% AFECTACIÓN)';
+                thead1.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Clúster</th><th>ONTs Afectadas</th><th>Total Clúster</th><th>% Afectación</th></tr>';
+                const grouped1 = {};
+                dataToGroup.forEach(p => {
+                    const key = `${p.red}_${p.cluster}`;
+                    if (!grouped1[key]) grouped1[key] = { red: p.red, olt: p.olt, cluster: p.cluster, fail: 0 };
+                    grouped1[key].fail++;
+                });
+                let rows1 = Object.values(grouped1).map(g => {
+                    const totalClu = rawPoints.filter(p => p.red === g.red && p.cluster === g.cluster).length;
+                    const pct = totalClu > 0 ? (g.fail / totalClu) * 100 : 0;
+                    return { ...g, totalClu, pct };
+                });
+                rows1.sort((a, b) => b.fail - a.fail || b.pct - a.pct);
+                
+                let sumFailClu = 0, sumTotalClu = 0;
+                rows1.forEach(g => {
+                    sumFailClu += g.fail;
+                    sumTotalClu += g.totalClu;
+                    tbody1.innerHTML += `<tr class="clickable-row" onclick="drillDownFilter('Cluster', '${g.cluster}')"><td><b>${g.red}</b></td><td>${g.olt}</td><td><b style="color:#38bdf8">${g.cluster}</b></td><td style="color:#f59e0b"><b>${g.fail.toLocaleString()}</b></td><td>${g.totalClu.toLocaleString()}</td><td style="color:#f59e0b"><b>${g.pct.toFixed(1)}%</b></td></tr>`;
+                });
+                tbody1.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td>-</td><td style="color:#f59e0b">${sumFailClu.toLocaleString()}</td><td>${sumTotalClu.toLocaleString()}</td><td>${sumTotalClu > 0 ? ((sumFailClu/sumTotalClu)*100).toFixed(1) : 0}%</td></tr>`;
+
+                title2.innerText = 'CANTIDAD DE CLÚSTER POR OLT CON FALLA';
+                thead2.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Cant. Clúster Falla</th></tr>';
+                const grouped2 = {};
+                dataToGroup.forEach(p => {
+                    const oltKey = `${p.red}_${p.olt}`;
+                    if (!grouped2[oltKey]) grouped2[oltKey] = { red: p.red, olt: p.olt, clusters: new Set() };
+                    grouped2[oltKey].clusters.add(p.cluster);
+                });
+                let rows2 = Object.values(grouped2).map(g => ({ red: g.red, olt: g.olt, cnt: g.clusters.size }));
+                rows2.sort((a, b) => b.cnt - a.cnt);
+                
+                let sumCluCnt = 0;
+                rows2.forEach(g => {
+                    sumCluCnt += g.cnt;
+                    tbody2.innerHTML += `<tr><td><b>${g.red}</b></td><td>${g.olt}</td><td style="color:#38bdf8"><b>${g.cnt.toLocaleString()}</b></td></tr>`;
+                });
+                tbody2.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td style="color:#38bdf8">${sumCluCnt.toLocaleString()}</td></tr>`;
+
+            } else if (macroType === 'Puerto (OTDR)') {
+                title1.innerText = 'RESUMEN PUERTOS PON CON FALLA (100% AFECTACIÓN)';
+                thead1.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Puerto PON</th><th>ONTs Afectadas / Total</th><th>% Afectación</th></tr>';
+                const grouped1 = {};
+                dataToGroup.forEach(p => {
+                    const key = `${p.red}_${p.olt}_${p.puerto}`;
+                    if (!grouped1[key]) grouped1[key] = { red: p.red, olt: p.olt, puerto: p.puerto, fail: 0 };
+                    grouped1[key].fail++;
+                });
+                let rows1 = Object.values(grouped1).map(g => {
+                    const totalPue = rawPoints.filter(p => p.red === g.red && p.olt === g.olt && p.puerto === g.puerto).length;
+                    const pct = totalPue > 0 ? (g.fail / totalPue) * 100 : 0;
+                    return { ...g, totalPue, pct };
+                });
+                rows1.sort((a, b) => b.fail - a.fail);
+                
+                let sumFailPue = 0, sumTotalPue = 0;
+                rows1.forEach(g => {
+                    sumFailPue += g.fail;
+                    sumTotalPue += g.totalPue;
+                    tbody1.innerHTML += `<tr class="clickable-row" onclick="drillDownFilter('Puerto PON', '${g.olt}', '${g.puerto}')"><td><b>${g.red}</b></td><td>${g.olt}</td><td><b style="color:#38bdf8">${g.puerto}</b></td><td style="color:#ef4444"><b>${g.fail} / ${g.totalPue}</b></td><td style="color:#ef4444"><b>${g.pct.toFixed(1)}%</b></td></tr>`;
+                });
+                tbody1.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td>-</td><td style="color:#ef4444">${sumFailPue.toLocaleString()} / ${sumTotalPue.toLocaleString()}</td><td>${sumTotalPue > 0 ? ((sumFailPue/sumTotalPue)*100).toFixed(1) : 0}%</td></tr>`;
+
+                title2.innerText = 'CANTIDAD DE PUERTOS PON CON FALLA';
+                thead2.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Cluster</th><th>Cant. Puertos Falla</th></tr>';
+                const grouped2 = {};
+                dataToGroup.forEach(p => {
+                    const cluKey = `${p.red}_${p.olt}_${p.cluster}`;
+                    if (!grouped2[cluKey]) grouped2[cluKey] = { red: p.red, olt: p.olt, cluster: p.cluster, puertos: new Set() };
+                    grouped2[cluKey].puertos.add(p.puerto);
+                });
+                let rows2 = Object.values(grouped2).map(g => ({ red: g.red, olt: g.olt, cluster: g.cluster, cnt: g.puertos.size }));
+                rows2.sort((a, b) => b.cnt - a.cnt);
+                
+                let sumPueCnt = 0;
+                rows2.forEach(g => {
+                    sumPueCnt += g.cnt;
+                    tbody2.innerHTML += `<tr><td><b>${g.red}</b></td><td>${g.olt}</td><td>${g.cluster}</td><td style="color:#38bdf8"><b>${g.cnt.toLocaleString()}</b></td></tr>`;
+                });
+                tbody2.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td>-</td><td style="color:#38bdf8">${sumPueCnt.toLocaleString()}</td></tr>`;
+
+            } else if (macroType === 'FAT Afectada') {
+                title1.innerText = 'RESUMEN CAJAS FAT AFECTADAS (100% AFECTACIÓN)';
+                thead1.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Puerto PON</th><th>Caja FAT</th><th>ONTs Afectadas / Total</th><th>% Afectación</th></tr>';
+                const grouped1 = {};
+                dataToGroup.forEach(p => {
+                    if (p.fat !== '') {
+                        const key = `${p.red}_${p.olt}_${p.puerto}_${p.fat}`;
+                        if (!grouped1[key]) grouped1[key] = { red: p.red, olt: p.olt, puerto: p.puerto, fat: p.fat, fail: 0 };
+                        grouped1[key].fail++;
+                    }
+                });
+                let rows1 = Object.values(grouped1).map(g => {
+                    const totalFat = rawPoints.filter(p => p.red === g.red && p.olt === g.olt && p.puerto === g.puerto && p.fat === g.fat).length;
+                    const pct = totalFat > 0 ? (g.fail / totalFat) * 100 : 0;
+                    return { ...g, totalFat, pct };
+                });
+                rows1.sort((a, b) => b.fail - a.fail);
+                
+                let sumFailFat = 0, sumTotalFat = 0;
+                rows1.forEach(g => {
+                    sumFailFat += g.fail;
+                    sumTotalFat += g.totalFat;
+                    tbody1.innerHTML += `<tr class="clickable-row" onclick="drillDownFilter('FAT', '${g.olt}', '${g.puerto}')"><td><b>${g.red}</b></td><td>${g.olt}</td><td>${g.puerto}</td><td><b style="color:#38bdf8">${g.fat}</b></td><td style="color:#f59e0b"><b>${g.fail} / ${g.totalFat}</b></td><td style="color:#f59e0b"><b>${g.pct.toFixed(1)}%</b></td></tr>`;
+                });
+                tbody1.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td>-</td><td>-</td><td style="color:#f59e0b">${sumFailFat.toLocaleString()} / ${sumTotalFat.toLocaleString()}</td><td>${sumTotalFat > 0 ? ((sumFailFat/sumTotalFat)*100).toFixed(1) : 0}%</td></tr>`;
+
+                title2.innerText = 'CANTIDAD DE CAJAS FAT CON FALLA';
+                thead2.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Cluster</th><th>Cant. FAT Falla</th></tr>';
+                const grouped2 = {};
+                dataToGroup.forEach(p => {
+                    if (p.fat !== '') {
+                        const cluKey = `${p.red}_${p.olt}_${p.cluster}`;
+                        if (!grouped2[cluKey]) grouped2[cluKey] = { red: p.red, olt: p.olt, cluster: p.cluster, fats: new Set() };
+                        grouped2[cluKey].fats.add(p.fat);
+                    }
+                });
+                let rows2 = Object.values(grouped2).map(g => ({ red: g.red, olt: g.olt, cluster: g.cluster, cnt: g.fats.size }));
+                rows2.sort((a, b) => b.cnt - a.cnt);
+                
+                let sumFatCnt = 0;
+                rows2.forEach(g => {
+                    sumFatCnt += g.cnt;
+                    tbody2.innerHTML += `<tr><td><b>${g.red}</b></td><td>${g.olt}</td><td>${g.cluster}</td><td style="color:#38bdf8"><b>${g.cnt.toLocaleString()}</b></td></tr>`;
+                });
+                tbody2.innerHTML += `<tr class="summary-table-total-row"><td>TOTAL</td><td>-</td><td>-</td><td style="color:#38bdf8">${sumFatCnt.toLocaleString()}</td></tr>`;
+            } else if (macroType === 'Falla Cliente') {
+                title1.innerText = 'RESUMEN DE CLIENTES AFECTADOS / FAT NO IDENTIFICADA';
+                thead1.innerHTML = '<tr><th>Red</th><th>OLT</th><th>Puerto PON</th><th>Caja FAT</th><th>Serie ONT</th><th>Causa Raíz</th></tr>';
+                dataToGroup.slice(0, 100).forEach(p => {
+                    tbody1.innerHTML += `<tr><td><b>${p.red}</b></td><td>${p.olt}</td><td>${p.puerto}</td><td>${p.fat || '(Sin FAT)'}</td><td><b>${p.serial}</b></td><td style="color:#38bdf8">${p.causa_raiz_noc}</td></tr>`;
+                });
+                panel2.style.display = 'none';
+            } else {
+                closeSummaryPanel();
+            }
+        }
+
+        function closeSummaryPanel() {
+            document.getElementById('summaryWrapper').style.display = 'none';
+            currentMacroFilter = 'TODOS';
+            applyFilters();
+        }
+
+        function filterBySymptom(s) { filterOnlyFailures = false; currentAttentionFilter = 'TODOS'; currentSymptomFilter = (currentSymptomFilter === s ? 'TODOS' : s); applyFilters(); }
+        function filterByAttentionType(type) { filterOnlyFailures = false; currentSymptomFilter = 'TODOS'; currentAttentionFilter = (currentAttentionFilter === type ? 'TODOS' : type); applyFilters(); }
+        function filterByFallas() { filterOnlyFailures = !filterOnlyFailures; currentSymptomFilter = 'TODOS'; currentAttentionFilter = 'TODOS'; applyFilters(); }
+        function filterByMacroCard(m) { filterOnlyFailures = false; if (currentMacroFilter === m) { closeSummaryPanel(); } else { renderSummaryTable(m); } }
+        function filterByBrand(b) { currentBrandFilter = (currentBrandFilter === b ? 'TODOS' : b); applyFilters(); }
+        function filterByAdvancedParam(param) { currentAdvancedFilter = (currentAdvancedFilter === param ? 'TODOS' : param); applyFilters(); }
+
+        function exportToExcel(type) {
+            const worksheet = XLSX.utils.json_to_sheet(activeFilteredPoints);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Claro_VTR_Report");
+            XLSX.writeFile(workbook, `Matriz_Claro_VTR_${type}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        document.addEventListener('DOMContentLoaded', initDashboardData);
     </script>
 </body>
 </html>
