@@ -8,7 +8,17 @@ URL_BASE_CLUSTERVIEW_POR_RED = {
     "CLARO": "https://poccl-01.traxium.net/clusterview/",
     "VTR": "https://poccl-02.traxium.net/clusterview/",
 }
+```[cite: 10]
 
+### Si te refieres a agregar otra red o un tercer enlace ahí mismo
+Solo agrega otra línea con su clave en mayúsculas y su URL terminada en `/` (y coma al final)[cite: 10]:
+
+```python
+URL_BASE_CLUSTERVIEW_POR_RED = {
+    "CLARO": "https://poccl-01.traxium.net/clusterview/",
+    "VTR": "https://poccl-02.traxium.net/clusterview/",
+    "OTRA_RED": "https://otra-url.traxium.net/clusterview/",
+}
 
 def buscar_archivo(nombre_parcial):
   for root, dirs, files in os.walk("."):
